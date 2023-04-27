@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autoxte"
+version = "0.1.0"
+description = ""
+authors = [
+    { name="Nicholas Kuechel", email="njkuechel@protonmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest >= 7.2.0",
+    "pytest-cov >= 3.0.0",
+    "flake8 >= 6.0.0",
+]
+
+[tool.setuptools]
+packages = ["autoxte"]
+
+[project.scripts]
