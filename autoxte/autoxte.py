@@ -1,161 +1,170 @@
+#! /usr/bin/env python3
+
+# AutoXTE
+# Copyright 2023 Nicholas Kuechel
+# License Apache 2.0
+
+
 import subprocess as sp
 import os
-import pandas as pd
-import time
 from astroquery.heasarc import Heasarc
 from astropy.table import Table
-from astropy.visualization import time_support
-from astropy.visualization import quantity_support
 from astropy.time import Time
-import datetime
+import wget
+import glob
+import shutil
+import gzip
 
-st = True
-observations = []
-ras = []
-decs = []
-cNums = []
-prnbs = []
 
-print('##############################################################################################')
-print('#                                   AutoXTE Data Reducer V4.1                                #')
-print('##############################################################################################')
-obj = str(input('Target: '))
+def extract_gz(file) -> str:
+    with gzip.open(file, "rb") as gz_in:
+        fname = str(file).split(".gz")
+        with open(fname[0], "wb") as orig_out:
+            shutil.copyfileobj(gz_in, orig_out)
+    os.remove(file)
+    return f"{file} -> {fname[0]}"
 
-q_set = str(input('Write Output Que: [n] '))
-q_path = 0
-q_name = 0
-if q_set == 'y':
-	q_path = str(input('Input Que: '))
-	if q_path[0] == r"'" or que_path[0] == r'"':
-		q_path = q_path.replace("'", "")
-		q_path = q_path.replace(" ", "")
-		q_path = q_path.replace('"', '')
-	else:
-		pass
-else:
-	pass
 
-heasarc = Heasarc()
-quantity_support()
-time_support()
-pca = heasarc.query_object(obj, mission='xtemaster', resultmax=1000000) # calls XTE master catalogue for crab
-pca = Table(pca).to_pandas()
+class Autoxte:
+    def __init__(self):
+        self.state = True
+        self.obs = []
+        self.ras = []
+        self.decs = []
+        self.cNums = []
+        self.prnbs = []
+        self.base_dir = os.getcwd()
+        print("##############  Auto XTE  ##############")
 
-cnt = 0
-for i in pca['OBSID']: # converts the form of the NICER obsid's to strings
-	i = i.decode()
-	pca.loc[cnt, 'OBSID'] = str(i)
-	cnt = cnt + 1
-cnt = 0	
-for i in pca['TIME']: # converts times from mjd to datetime format
-	t0 = Time(i, format='mjd').to_datetime()
-	pca.loc[cnt, 'TIME'] = t0
-	cnt = cnt + 1
-pca = pca.loc[pca['EXPOSURE'] != 0]
+    def query(self, target=None):
+        """
+        Querys xtemaster @ heasarc for a specific target
+        """
+        obj = str(input("Target: "))
+        heasarc = Heasarc()
+        pca = heasarc.query_object(obj, mission="xtemaster", resultmax=1000000)
+        pca = Table(pca).to_pandas()
+        cnt = 0
+        for i in pca["OBSID"]:
+            i = i.decode()
+            pca.loc[cnt, "OBSID"] = str(i)
+            cnt = cnt + 1
+        cnt = 0
+        for i in pca["TIME"]:  # converts times from mjd to datetime format
+            t0 = Time(i, format="mjd").to_datetime()
+            pca.loc[cnt, "TIME"] = t0
+            cnt = cnt + 1
+        pca = pca.loc[pca["EXPOSURE"] != 0]
+        return pca
 
-downCommand = ('wget -q -nH --no-check-certificate --cut-dirs=5 -r -l0 -c -N -np -R '+'\'index*\''+' -erobots=off --retr-symlinks https://heasarc.gsfc.nasa.gov/FTP/xte/data/archive/AO')
-# beginning of obsid inputs
-while st == True: 
-	enter = str(input('autoXTE >> '))
-	if enter == 'done' or enter == 'Done':
-		st = False
-	elif enter == 'version' or enter =='-v':
-		print('autoXTE V4.1 Date Modified September 14, 2021')
-	elif enter == 'sel' or enter == 'Sel' or enter == 'SEL':
-		print('Observations Selected:')
-		for i in observations:
-			print(i)
-	elif enter == 'back' or enter == 'Back' or enter == 'BACK':
-		print('Old Que: ' + str(observations))
-		del observations[-1]
-		del ras[-1]
-		del decs[-1]
-		del cNums[-1]
-		del prnbs[-1]
-		print('New Que: ' + str(observations))
-	else:
-		if len(str(enter)) == 5:
-			rows = pca.loc[pca['PRNB'] == int(enter)]
-			print(rows)
-			for i in rows['OBSID']:
-				observations.append(i)
-			for i in rows['RA']:
-				ras.append(i)
-			for i in rows['DEC']:
-				decs.append(i)
-			for i in rows['PRNB']:
-				prnbs.append(i)
-				prnb = str(i)
-				if int(prnb[0]) == 9:
-					cycles = [9, 10, 11, 12, 13, 14, 15, 16]
-					cNums.append(cycles[int(prnb[1])])
-				else:
-					cNums.append(int(prnb[0]))
-		elif enter == 'all':
-			for i in pca['OBSID']:
-				observations.append(i)
-			for i in pca['RA']:
-				ras.append(i)
-			for i in pca['DEC']:
-				decs.append(i)
-			for i in pca['PRNB']:
-				prnbs.append(i)
-				prnb = str(i)
-				if int(prnb[0]) == 9:
-					cycles = [9, 10, 11, 12, 13, 14, 15, 16]
-					cNums.append(cycles[int(prnb[1])])
-				else:
-					cNums.append(int(prnb[0]))
-		else:
-			observations.append(enter)
-			row = pca.loc[pca['OBSID'] == enter]
-			dt = row['TIME']
-			row.reset_index(drop=True, inplace=True)
-			dt.reset_index(drop=True, inplace=True)
-			# basic if else statement to fix single digit months not having a zero out front
-			ras.append(row['RA'][0])
-			decs.append(row['DEC'][0])
-			prnbs.append(row['PRNB'][0])
-			prnb = str(row['PRNB'][0])
-			if int(prnb[0]) == 9:
-				cycles = [9, 10, 11, 12, 13, 14, 15, 16]
-				cNums.append(cycles[int(prnb[1])])
-			else:
-				cNums.append(int(prnb[0]))
-			ras.append(row['RA'][0])
-			decs.append(row['DEC'][0])
-count = 0
-for obsid in observations:
-	print('')
-	print('--------------------------------------------------------------')
-	print('             Prosessing OBSID: ' + str(obsid)) 
-	print('--------------------------------------------------------------')
-	print('Downloading 00 data...')
-	sp.call(str(downCommand) + str(cNums[count]) + '//P' + str(prnbs[count]) + '/' + str(observations[count]) + '/ --show-progress --progress=bar:force', shell=True)
-	
-	base_dir = os.getcwd()
-	orb_file = sp.run('ls P' + str(prnbs[count]) + '/' + str(observations[count]) + '/orbit/FP*', shell=True, capture_output=True, encoding='utf-8')
-	orb_file = orb_file.stdout.split('\n')
-	orb_file.remove('')
-	orb_file = str(base_dir) + '/' + str(orb_file[0])
-	os.chdir('P' + str(prnbs[count]) + '/' + str(observations[count]) + '/pca')
-	sp.call('gzip -d *evt.gz', shell=True)
-	evt_files = sp.run('ls *evt', shell=True, capture_output=True, encoding='utf-8')
-	evt_files = evt_files.stdout.split('\n')
-	evt_files.remove('')
-	ccn = 1
-	for i in evt_files:
-		sp.call('barycorr infile=' + str(i) + ' outfile=bcSE_' + str(obsid) + '_' + str(ccn) + '.evt orbitfiles=' + str(orb_file) + ' refframe=ICRS ra=' + str(ras[count]) + ' dec=' + str(decs[count]), shell=True)
-		if q_set == 'y':
-			read_q = pd.read_csv(q_path)
-			newline = pd.Series(data=[str(base_dir) + '/' + 'P' + str(prnbs[count]) + '/' + str(observations[count]) + '/pca/' + 'bcSE_' + str(obsid) + '_' + str(ccn) + '.evt', 'XTE' + str(obsid)], index=['Input', 'Name'])
-			read_q = read_q.append(newline, ignore_index=True)
-			read_q.to_csv(q_path, index=False)
-		else:
-			pass
-		ccn = ccn + 1		
-	os.chdir(base_dir)
-	count = count + 1
+    def selection(self, table):
+        """
+        Interface for selecting the OBSIDs to be retrieved
+        """
+        while self.state is True:
+            enter = str(input("autoXTE >> "))
+            if enter.lower() == "done":
+                self.state = False
+            elif enter == "version" or enter == "-v":
+                print("autoXTE V4.1 Date Modified September 14, 2021")
+            elif enter.lower() == "sel":
+                print("Observations Selected:")
+                for i in self.obs:
+                    print(i)
+            elif enter.lower() == "back":
+                del self.obs[-1]
+                del self.ras[-1]
+                del self.decs[-1]
+                del self.cNums[-1]
+                del self.prnbs[-1]
+            else:
+                if len(str(enter)) == 5:
+                    rows = table.loc[table["PRNB"] == int(enter)]
+                    print(rows)
+                    for i in rows["OBSID"]:
+                        self.obs.append(i)
+                    for i in rows["RA"]:
+                        self.ras.append(i)
+                    for i in rows["DEC"]:
+                        self.decs.append(i)
+                    for i in rows["PRNB"]:
+                        self.prnbs.append(i)
+                        prnb = str(i)
+                        if int(prnb[0]) == 9:
+                            cycles = [9, 10, 11, 12, 13, 14, 15, 16]
+                            self.cNums.append(cycles[int(prnb[1])])
+                        else:
+                            self.cNums.append(int(prnb[0]))
+                elif enter == "all":
+                    for i in table["OBSID"]:
+                        self.obs.append(i)
+                    for i in table["RA"]:
+                        self.ras.append(i)
+                    for i in table["DEC"]:
+                        self.decs.append(i)
+                    for i in table["PRNB"]:
+                        self.prnbs.append(i)
+                        prnb = str(i)
+                        if int(prnb[0]) == 9:
+                            cycles = [9, 10, 11, 12, 13, 14, 15, 16]
+                            self.cNums.append(cycles[int(prnb[1])])
+                        else:
+                            self.cNums.append(int(prnb[0]))
+                else:
+                    self.obs.append(enter)
+                    row = table.loc[table["OBSID"] == enter]
+                    dt = row["TIME"]
+                    row.reset_index(drop=True, inplace=True)
+                    dt.reset_index(drop=True, inplace=True)
+                    self.ras.append(row["RA"][0])
+                    self.decs.append(row["DEC"][0])
+                    self.prnbs.append(row["PRNB"][0])
+                    prnb = str(row["PRNB"][0])
+                    if int(prnb[0]) == 9:
+                        cycles = [9, 10, 11, 12, 13, 14, 15, 16]
+                        self.cNums.append(cycles[int(prnb[1])])
+                    else:
+                        self.cNums.append(int(prnb[0]))
+                    self.ras.append(row["RA"][0])
+                    self.decs.append(row["DEC"][0])
 
-print('################################################################################################')
-print('Process Done')
+    def retrieve(self, index):
+        """
+        Retrieves an XTE dataset for a specified obsid
+        """
+        obsid = self.obs[index]
+        downurl = "https://heasarc.gsfc.nasa.gov/FTP/xte/data/archive/AO"
+        print("-----------------------------------------------------")
+        print(f"           Prosessing OBSID: {obsid}")
+        print("-----------------------------------------------------")
+        print("Downloading 00 data...")
+        fullurl = (
+            f"{downurl}{self.cNums[index]}//" +
+            f"P{self.prnbs[index]}/{obsid}/"
+        )
+        wget.download(fullurl)
+
+    def barycenter(self, index):
+        """
+        Calls the HEASoft's barycorr tool to perform
+        a barycenter correction to .evt data
+        """
+        obsid = self.obs[index]
+        orb_file = glob.glob(f"P{self.prnbs[index]}/" +
+                             f"{self.obs[index]}/orbit/FP*")
+        orb_file = f"{self.base_dir}/{orb_file[0]}"
+        os.chdir("P{self.prnbs[index]}/{self.obs[index]}/pca")
+        gzevts = glob.glob("*.evt.gz")
+        for i in gzevts:
+            extract_gz(i)
+        evt_files = glob.glob("*evt")
+        ccn = 1
+        for i in evt_files:
+            sp.call(
+                f"barycorr infile={i} outfile=bcSE_{obsid}_{ccn}.evt"
+                + f"orbitfiles={orb_file} refframe=ICRS"
+                + f"ra={self.ras[index]} dec={self.decs[index]}",
+                shell=True,
+            )
+            ccn = ccn + 1
+        os.chdir(self.base_dir)
