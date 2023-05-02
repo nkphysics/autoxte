@@ -7,6 +7,7 @@
 
 import subprocess as sp
 import os
+import argparse
 from astroquery.heasarc import Heasarc
 from astropy.table import Table
 from astropy.time import Time
@@ -17,6 +18,9 @@ import gzip
 
 
 def extract_gz(file) -> str:
+    """
+    Extracts .gz file
+    """
     with gzip.open(file, "rb") as gz_in:
         fname = str(file).split(".gz")
         with open(fname[0], "wb") as orig_out:
@@ -168,3 +172,32 @@ class Autoxte:
             )
             ccn = ccn + 1
         os.chdir(self.base_dir)
+
+
+def cli(args=None):
+    """
+    Command line interface argument parsing
+    """
+    p = argparse.ArgumentParser(
+            description="A program for piplining XTE data" +
+                        "retrieval and barycenter correcting"
+    )
+
+    p.add_argument(
+        "-src",
+        "--source",
+        help="Set the src from the command line",
+        type=str,
+        default=None,
+    )
+
+    p.add_argument(
+        "-bc",
+        "--bc",
+        help="Engages option for a barycenter correction" +
+             "in data reduction procedure",
+        action="store_true",
+        default=None,
+    )
+    argp = p.parse_args(args)
+    return argp
