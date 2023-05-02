@@ -27,41 +27,44 @@ def extract_gz(file) -> str:
             shutil.copyfileobj(gz_in, orig_out)
     os.remove(file)
     return f"{file} -> {fname[0]}"
+    
+
+def query_obj(target=None):
+    """
+    Querys xtemaster @ heasarc for a specific target
+    """
+    if target is None:
+        target = str(input("Target: "))
+    heasarc = Heasarc()
+    pca = heasarc.query_object(target, mission="xtemaster", resultmax=1000000)
+    pca = Table(pca).to_pandas()
+    cnt = 0
+    for i in pca["OBSID"]:
+        i = i.decode()
+        pca.loc[cnt, "OBSID"] = str(i)
+        cnt = cnt + 1
+    cnt = 0
+    for i in pca["TIME"]:  # converts times from mjd to datetime format
+        t0 = Time(i, format="mjd").to_datetime()
+        pca.loc[cnt, "TIME"] = t0
+        cnt = cnt + 1
+    pca = pca.loc[pca["EXPOSURE"] != 0]
+    return pca
 
 
 class Autoxte:
-    def __init__(self):
+    def __init__(self, target=None):
         self.state = True
+        self.table = query_obj(target)
         self.obs = []
         self.ras = []
         self.decs = []
         self.cNums = []
         self.prnbs = []
         self.base_dir = os.getcwd()
-        print("##############  Auto XTE  ##############")
+        print("##############  Auto XTE  ##############\n")
 
-    def query(self, target=None):
-        """
-        Querys xtemaster @ heasarc for a specific target
-        """
-        obj = str(input("Target: "))
-        heasarc = Heasarc()
-        pca = heasarc.query_object(obj, mission="xtemaster", resultmax=1000000)
-        pca = Table(pca).to_pandas()
-        cnt = 0
-        for i in pca["OBSID"]:
-            i = i.decode()
-            pca.loc[cnt, "OBSID"] = str(i)
-            cnt = cnt + 1
-        cnt = 0
-        for i in pca["TIME"]:  # converts times from mjd to datetime format
-            t0 = Time(i, format="mjd").to_datetime()
-            pca.loc[cnt, "TIME"] = t0
-            cnt = cnt + 1
-        pca = pca.loc[pca["EXPOSURE"] != 0]
-        return pca
-
-    def selection(self, table):
+    def selection(self):
         """
         Interface for selecting the OBSIDs to be retrieved
         """
@@ -83,7 +86,7 @@ class Autoxte:
                 del self.prnbs[-1]
             else:
                 if len(str(enter)) == 5:
-                    rows = table.loc[table["PRNB"] == int(enter)]
+                    rows = self.table.loc[self.table["PRNB"] == int(enter)]
                     print(rows)
                     for i in rows["OBSID"]:
                         self.obs.append(i)
@@ -100,13 +103,13 @@ class Autoxte:
                         else:
                             self.cNums.append(int(prnb[0]))
                 elif enter == "all":
-                    for i in table["OBSID"]:
+                    for i in self.table["OBSID"]:
                         self.obs.append(i)
-                    for i in table["RA"]:
+                    for i in self.table["RA"]:
                         self.ras.append(i)
-                    for i in table["DEC"]:
+                    for i in self.table["DEC"]:
                         self.decs.append(i)
-                    for i in table["PRNB"]:
+                    for i in self.table["PRNB"]:
                         self.prnbs.append(i)
                         prnb = str(i)
                         if int(prnb[0]) == 9:
@@ -116,7 +119,7 @@ class Autoxte:
                             self.cNums.append(int(prnb[0]))
                 else:
                     self.obs.append(enter)
-                    row = table.loc[table["OBSID"] == enter]
+                    row = self.table.loc[self.table["OBSID"] == enter]
                     dt = row["TIME"]
                     row.reset_index(drop=True, inplace=True)
                     dt.reset_index(drop=True, inplace=True)
@@ -132,7 +135,7 @@ class Autoxte:
                     self.ras.append(row["RA"][0])
                     self.decs.append(row["DEC"][0])
 
-    def retrieve(self, index):
+    def pull(self, index):
         """
         Retrieves an XTE dataset for a specified obsid
         """
@@ -146,7 +149,7 @@ class Autoxte:
             f"{downurl}{self.cNums[index]}//" +
             f"P{self.prnbs[index]}/{obsid}/"
         )
-        wget.download(fullurl)
+        return wget.download(fullurl)
 
     def barycenter(self, index):
         """
@@ -172,7 +175,16 @@ class Autoxte:
             )
             ccn = ccn + 1
         os.chdir(self.base_dir)
-
+        
+    def pull_reduce(self):
+        """
+        Pulls all selected OBSIDs
+        """
+        for i in self.obs:
+            index = self.obs.index(i)
+            self.pull(index)
+            self.barycenter(index)
+            
 
 def cli(args=None):
     """
