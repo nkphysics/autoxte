@@ -8,10 +8,10 @@
 import subprocess as sp
 import os
 import argparse
+import pandas
+import pathlib as pl
 from astroquery.heasarc import Heasarc
 from astropy.table import Table
-from astropy.time import Time
-import wget
 import glob
 import shutil
 import gzip
@@ -27,7 +27,7 @@ def extract_gz(file) -> str:
             shutil.copyfileobj(gz_in, orig_out)
     os.remove(file)
     return f"{file} -> {fname[0]}"
-    
+
 
 def query_obj(target=None):
     """
@@ -36,24 +36,18 @@ def query_obj(target=None):
     if target is None:
         target = str(input("Target: "))
     heasarc = Heasarc()
+    Heasarc.clear_cache()
     pca = heasarc.query_object(target, mission="xtemaster", resultmax=1000000)
     pca = Table(pca).to_pandas()
-    cnt = 0
-    for i in pca["OBSID"]:
-        i = i.decode()
-        pca.loc[cnt, "OBSID"] = str(i)
-        cnt = cnt + 1
-    cnt = 0
-    for i in pca["TIME"]:  # converts times from mjd to datetime format
-        t0 = Time(i, format="mjd").to_datetime()
-        pca.loc[cnt, "TIME"] = t0
-        cnt = cnt + 1
+    pca["OBSID"] = pca["OBSID"].str.decode("utf-8")
+    pca["PRNB"] = pca["PRNB"].str.decode("utf-8")
     pca = pca.loc[pca["EXPOSURE"] != 0]
     return pca
 
 
 class Autoxte:
     def __init__(self, target=None):
+        print("##############  Auto XTE  ##############\n")
         self.state = True
         self.table = query_obj(target)
         self.obs = []
@@ -62,7 +56,6 @@ class Autoxte:
         self.cNums = []
         self.prnbs = []
         self.base_dir = os.getcwd()
-        print("##############  Auto XTE  ##############\n")
 
     def selection(self):
         """
@@ -149,7 +142,13 @@ class Autoxte:
             f"{downurl}{self.cNums[index]}//" +
             f"P{self.prnbs[index]}/{obsid}/"
         )
-        return wget.download(fullurl)
+        endargs = "--show-progress --progress=bar:force"
+        downcommand = (
+            "wget -q -nH --no-check-certificate --cut-dirs=5 "
+            + "-r -l0 -c -N -np -R 'index*'"
+            + f" -erobots=off --retr-symlinks {fullurl} {endargs}"
+        )
+        return sp.call(downcommand, shell=True)
 
     def barycenter(self, index):
         """
@@ -157,10 +156,11 @@ class Autoxte:
         a barycenter correction to .evt data
         """
         obsid = self.obs[index]
-        orb_file = glob.glob(f"P{self.prnbs[index]}/" +
-                             f"{self.obs[index]}/orbit/FP*")
-        orb_file = f"{self.base_dir}/{orb_file[0]}"
-        os.chdir("P{self.prnbs[index]}/{self.obs[index]}/pca")
+        obsbasepath = f"P{self.prnbs[index]}/{self.obs[index]}"
+        orbfile = glob.glob(f"{self.base_dir}/{obsbasepath}/orbit/FP*")[0]
+        print(f"Orbitfile: {orbfile}")
+        pcapath = pl.Path(f"{obsbasepath}/pca/").resolve()
+        os.chdir(pcapath)
         gzevts = glob.glob("*.evt.gz")
         for i in gzevts:
             extract_gz(i)
@@ -169,22 +169,23 @@ class Autoxte:
         for i in evt_files:
             sp.call(
                 f"barycorr infile={i} outfile=bcSE_{obsid}_{ccn}.evt"
-                + f"orbitfiles={orb_file} refframe=ICRS"
-                + f"ra={self.ras[index]} dec={self.decs[index]}",
+                + f" orbitfiles={orbfile} refframe=ICRS"
+                + f" ra={self.ras[index]} dec={self.decs[index]}",
                 shell=True,
             )
             ccn = ccn + 1
         os.chdir(self.base_dir)
-        
-    def pull_reduce(self):
+
+    def pull_reduce(self, bc):
         """
         Pulls all selected OBSIDs
         """
         for i in self.obs:
             index = self.obs.index(i)
             self.pull(index)
-            self.barycenter(index)
-            
+            if bc is True:
+                self.barycenter(index)
+
 
 def cli(args=None):
     """
@@ -213,3 +214,10 @@ def cli(args=None):
     )
     argp = p.parse_args(args)
     return argp
+
+
+def main():
+    args = cli()
+    xte = Autoxte(target=args.source)
+    xte.selection()
+    xte.pull_reduce(args.bc)
