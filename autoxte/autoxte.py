@@ -62,7 +62,7 @@ class Autoxte:
         Interface for selecting the OBSIDs to be retrieved
         """
         while self.state is True:
-            enter = str(input("autoXTE >> "))
+            enter = str(input("autoXTE > "))
             if enter.lower() == "done":
                 self.state = False
             elif enter == "version" or enter == "-v":
@@ -167,8 +167,9 @@ class Autoxte:
         evt_files = glob.glob("*evt")
         ccn = 1
         for i in evt_files:
+            evttype = i.split("_")[0]
             sp.call(
-                f"barycorr infile={i} outfile=bcSE_{obsid}_{ccn}.evt"
+                f"barycorr infile={i} outfile=bc{evttype}_{obsid}_{ccn}.evt"
                 + f" orbitfiles={orbfile} refframe=ICRS"
                 + f" ra={self.ras[index]} dec={self.decs[index]}",
                 shell=True,
