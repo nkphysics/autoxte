@@ -29,6 +29,18 @@ def extract_gz(file) -> str:
     return f"{file} -> {fname[0]}"
 
 
+def compress_gz(file) -> str:
+    """
+    Gzips a specified file and removes
+    the original specified file after compression
+    """
+    with open(file, "rb") as f_in:
+        with gzip.open(f"{file}.gz", "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    os.remove(file)
+    return f"{file} -> {file}.gz"
+
+
 def query_obj(target=None):
     """
     Querys xtemaster @ heasarc for a specific target
@@ -174,6 +186,8 @@ class Autoxte:
                 + f" ra={self.ras[index]} dec={self.decs[index]}",
                 shell=True,
             )
+            comp_org = compress_gz(i)
+            print(comp_org)
             ccn = ccn + 1
         os.chdir(self.base_dir)
 
