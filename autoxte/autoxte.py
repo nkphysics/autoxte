@@ -73,58 +73,60 @@ class Autoxte:
         """
         Interface for selecting the OBSIDs to be retrieved
         """
+        cyc_aliass = ["cycle", "prnb"]
         while self.state is True:
-            enter = str(input("autoXTE > "))
-            if enter.lower() == "done":
+            enter = str(input("autoXTE > ")).split(" ")
+            if enter[0].lower() == "done":
                 self.state = False
-            elif enter == "version" or enter == "-v":
-                print("autoXTE V4.1 Date Modified September 14, 2021")
-            elif enter.lower() == "sel":
+            elif enter[0].lower() == "sel":
                 print("Observations Selected:")
                 for i in self.obs:
                     print(i)
-            elif enter.lower() == "back":
+            elif enter[0].lower() == "back":
                 del self.obs[-1]
                 del self.ras[-1]
                 del self.decs[-1]
                 del self.cNums[-1]
                 del self.prnbs[-1]
+            elif enter[0].lower() in cyc_aliass:
+                rows = self.table.loc[self.table["PRNB"] == str(enter[1])]
+                print(rows)
+                for i in rows["OBSID"]:
+                    self.obs.append(i)
+                    print(f"Added {i}")
+                for i in rows["RA"]:
+                    self.ras.append(i)
+                for i in rows["DEC"]:
+                    self.decs.append(i)
+                for i in rows["PRNB"]:
+                    self.prnbs.append(int(i))
+                    prnb = str(i)
+                    if int(prnb[0]) == 9:
+                        cycles = [9, 10, 11, 12, 13, 14, 15, 16]
+                        self.cNums.append(cycles[int(prnb[1])])
+                    else:
+                        self.cNums.append(int(prnb[0]))
+            elif enter[0].lower() == "all":
+                for i in self.table["OBSID"]:
+                    self.obs.append(i)
+                for i in self.table["RA"]:
+                    self.ras.append(i)
+                for i in self.table["DEC"]:
+                    self.decs.append(i)
+                for i in self.table["PRNB"]:
+                    self.prnbs.append(i)
+                    prnb = str(i)
+                    if int(prnb[0]) == 9:
+                        cycles = [9, 10, 11, 12, 13, 14, 15, 16]
+                        self.cNums.append(cycles[int(prnb[1])])
+                    else:
+                        self.cNums.append(int(prnb[0]))
+            elif enter[0].lower() == "exit":
+                exit()
             else:
-                if len(str(enter)) == 5:
-                    rows = self.table.loc[self.table["PRNB"] == int(enter)]
-                    print(rows)
-                    for i in rows["OBSID"]:
-                        self.obs.append(i)
-                    for i in rows["RA"]:
-                        self.ras.append(i)
-                    for i in rows["DEC"]:
-                        self.decs.append(i)
-                    for i in rows["PRNB"]:
-                        self.prnbs.append(i)
-                        prnb = str(i)
-                        if int(prnb[0]) == 9:
-                            cycles = [9, 10, 11, 12, 13, 14, 15, 16]
-                            self.cNums.append(cycles[int(prnb[1])])
-                        else:
-                            self.cNums.append(int(prnb[0]))
-                elif enter == "all":
-                    for i in self.table["OBSID"]:
-                        self.obs.append(i)
-                    for i in self.table["RA"]:
-                        self.ras.append(i)
-                    for i in self.table["DEC"]:
-                        self.decs.append(i)
-                    for i in self.table["PRNB"]:
-                        self.prnbs.append(i)
-                        prnb = str(i)
-                        if int(prnb[0]) == 9:
-                            cycles = [9, 10, 11, 12, 13, 14, 15, 16]
-                            self.cNums.append(cycles[int(prnb[1])])
-                        else:
-                            self.cNums.append(int(prnb[0]))
-                else:
-                    self.obs.append(enter)
-                    row = self.table.loc[self.table["OBSID"] == enter]
+                try:
+                    self.obs.append(enter[0])
+                    row = self.table.loc[self.table["OBSID"] == enter[0]]
                     dt = row["TIME"]
                     row.reset_index(drop=True, inplace=True)
                     dt.reset_index(drop=True, inplace=True)
@@ -139,6 +141,8 @@ class Autoxte:
                         self.cNums.append(int(prnb[0]))
                     self.ras.append(row["RA"][0])
                     self.decs.append(row["DEC"][0])
+                except KeyError:
+                    print("Unknown Entry")
 
     def pull(self, index):
         """
