@@ -173,7 +173,11 @@ class Autoxte:
         """
         obsid = self.obs[index]
         obsbasepath = f"P{self.prnbs[index]}/{self.obs[index]}"
-        orbfile = glob.glob(f"{self.base_dir}/{obsbasepath}/orbit/FP*")[0]
+        try:
+            orbfile = glob.glob(f"{self.base_dir}/{obsbasepath}/orbit/FP*")[0]
+        except IndexError:
+            print("Orbitfile not found")
+            return False
         print(f"Orbitfile: {orbfile}")
         pcapath = pl.Path(f"{obsbasepath}/pca/").resolve()
         os.chdir(pcapath)
@@ -181,19 +185,18 @@ class Autoxte:
         for i in gzevts:
             extract_gz(i)
         evt_files = glob.glob("*evt")
-        ccn = 1
-        for i in evt_files:
+        for n, i in enumerate(evt_files, start=1):
             evttype = i.split("_")[0]
             sp.call(
-                f"barycorr infile={i} outfile=bc{evttype}_{obsid}_{ccn}.evt"
+                f"barycorr infile={i} outfile=bc{evttype}_{obsid}_{n}.evt"
                 + f" orbitfiles={orbfile} refframe=ICRS"
                 + f" ra={self.ras[index]} dec={self.decs[index]}",
                 shell=True,
             )
             comp_org = compress_gz(i)
             print(comp_org)
-            ccn = ccn + 1
         os.chdir(self.base_dir)
+        return True
 
     def pull_reduce(self, bc):
         """
