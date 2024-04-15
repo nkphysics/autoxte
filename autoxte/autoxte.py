@@ -11,6 +11,7 @@ import argparse
 import pathlib as pl
 from astroquery.heasarc import Heasarc
 from astropy.table import Table
+from termcolor import colored
 import glob
 import shutil
 import sys
@@ -155,9 +156,10 @@ class Autoxte:
         Retrieves an XTE dataset for a specified obsid
         """
         obsid = self.obs[index]
+        colobsid = colored(str(obsid), "cyan")
         downurl = "https://heasarc.gsfc.nasa.gov/FTP/xte/data/archive/AO"
         self.logger.info("---------------------------------------------------")
-        self.logger.info(f"          Prosessing OBSID: {obsid}")
+        self.logger.info(f"          Prosessing OBSID: {colobsid}")
         self.logger.info("---------------------------------------------------")
         self.logger.info("Downloading 00 data...")
         fullurl = (
