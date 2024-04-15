@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 # AutoXTE
-# Copyright 2023 Nicholas Kuechel
+# Copyright 2023-2024 Nicholas Kuechel
 # License Apache 2.0
 
 
@@ -14,7 +14,13 @@ from astroquery.heasarc import Heasarc
 from astropy.table import Table
 import glob
 import shutil
+import sys
+import pkg_resources
+import logging
 import gzip
+
+AUTOXTE = os.path.basename(sys.argv[0])
+VERSION = pkg_resources.get_distribution('autoxte').version
 
 
 def extract_gz(file) -> str:
@@ -59,7 +65,8 @@ def query_obj(target=None):
 
 class Autoxte:
     def __init__(self, target=None):
-        print("##############  Auto XTE  ##############\n")
+        self.logger = logging.getLogger(AUTOXTE)
+        self.logger.info("##############  Auto XTE  ##############\n")
         self.state = True
         self.table = query_obj(target)
         self.obs = []
@@ -79,9 +86,9 @@ class Autoxte:
             if enter[0].lower() == "done":
                 self.state = False
             elif enter[0].lower() == "sel":
-                print("Observations Selected:")
+                self.logger.info("Observations Selected:")
                 for i in self.obs:
-                    print(i)
+                    self.logger.info(i)
             elif enter[0].lower() == "back":
                 del self.obs[-1]
                 del self.ras[-1]
@@ -90,10 +97,10 @@ class Autoxte:
                 del self.prnbs[-1]
             elif enter[0].lower() in cyc_aliass:
                 rows = self.table.loc[self.table["PRNB"] == str(enter[1])]
-                print(rows)
+                self.logger.info(rows)
                 for i in rows["OBSID"]:
                     self.obs.append(i)
-                    print(f"Added {i}")
+                    self.logger.info(f"Added {i}")
                 for i in rows["RA"]:
                     self.ras.append(i)
                 for i in rows["DEC"]:
@@ -142,7 +149,7 @@ class Autoxte:
                     self.ras.append(row["RA"][0])
                     self.decs.append(row["DEC"][0])
                 except KeyError:
-                    print("Unknown Entry")
+                    self.logger.info("Unknown Entry")
 
     def pull(self, index):
         """
@@ -150,10 +157,10 @@ class Autoxte:
         """
         obsid = self.obs[index]
         downurl = "https://heasarc.gsfc.nasa.gov/FTP/xte/data/archive/AO"
-        print("-----------------------------------------------------")
-        print(f"           Prosessing OBSID: {obsid}")
-        print("-----------------------------------------------------")
-        print("Downloading 00 data...")
+        self.logger.info("-----------------------------------------------------")
+        self.logger.info(f"           Prosessing OBSID: {obsid}")
+        self.logger.info("-----------------------------------------------------")
+        self.logger.info("Downloading 00 data...")
         fullurl = (
             f"{downurl}{self.cNums[index]}//" +
             f"P{self.prnbs[index]}/{obsid}/"
@@ -176,9 +183,9 @@ class Autoxte:
         try:
             orbfile = glob.glob(f"{self.base_dir}/{obsbasepath}/orbit/FP*")[0]
         except IndexError:
-            print("Orbitfile not found")
+            self.logger.info("Orbitfile not found")
             return False
-        print(f"Orbitfile: {orbfile}")
+        self.logger.info(f"Orbitfile: {orbfile}")
         pcapath = pl.Path(f"{obsbasepath}/pca/").resolve()
         os.chdir(pcapath)
         gzevts = glob.glob("*.evt.gz")
@@ -194,7 +201,7 @@ class Autoxte:
                 shell=True,
             )
             comp_org = compress_gz(i)
-            print(comp_org)
+            self.logger.info(comp_org)
         os.chdir(self.base_dir)
         return True
 
@@ -239,6 +246,10 @@ def cli(args=None):
 
 
 def main():
+    level = logging.INFO
+    logging.basicConfig(stream=sys.stdout,
+                        level=level,
+                        format="")
     args = cli()
     xte = Autoxte(target=args.source)
     xte.selection()
