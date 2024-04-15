@@ -256,6 +256,12 @@ def cli(args=None):
         action="store_true",
         default=None,
     )
+
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {VERSION}"
+    )
     argp = p.parse_args(args)
     return argp
 
