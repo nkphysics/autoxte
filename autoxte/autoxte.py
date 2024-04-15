@@ -217,7 +217,9 @@ class Autoxte:
         bloatdirs = ["ace", "acs", "clock", "eds", "fds", "gsace",
                      "ifog", "ipsdu", "pse", "spsdu"]
         for i in bloatdirs:
-            shutil.rmtree(f"{obsbasepath}/{i}/")
+            bloatdir = f"{obsbasepath}/{i}/"
+            self.logger.debug(f"Removing {bloatdir}")
+            shutil.rmtree(bloatdir)
 
     def pull_reduce(self, bc) -> None:
         """
