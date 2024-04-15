@@ -8,7 +8,6 @@
 import subprocess as sp
 import os
 import argparse
-import pandas
 import pathlib as pl
 from astroquery.heasarc import Heasarc
 from astropy.table import Table
@@ -157,9 +156,9 @@ class Autoxte:
         """
         obsid = self.obs[index]
         downurl = "https://heasarc.gsfc.nasa.gov/FTP/xte/data/archive/AO"
-        self.logger.info("-----------------------------------------------------")
-        self.logger.info(f"           Prosessing OBSID: {obsid}")
-        self.logger.info("-----------------------------------------------------")
+        self.logger.info("---------------------------------------------------")
+        self.logger.info(f"          Prosessing OBSID: {obsid}")
+        self.logger.info("---------------------------------------------------")
         self.logger.info("Downloading 00 data...")
         fullurl = (
             f"{downurl}{self.cNums[index]}//" +
@@ -205,7 +204,20 @@ class Autoxte:
         os.chdir(self.base_dir)
         return True
 
-    def pull_reduce(self, bc):
+    def remove_bloatdirs(self, index) -> None:
+        """
+        Removed unnecessary dirs in pulled XTE datasets
+        as defined at
+        https://heasarc.gsfc.nasa.gov/docs/xte/start_guide.html,
+        section 4.5
+        """
+        obsbasepath = f"P{self.prnbs[index]}/{self.obs[index]}"
+        bloatdirs = ["ace", "acs", "clock", "eds", "fds", "gsace",
+                     "ifog", "ipsdu", "pse", "spsdu"]
+        for i in bloatdirs:
+            shutil.rmtree(f"{obsbasepath}/{i}/")
+
+    def pull_reduce(self, bc) -> None:
         """
         Pulls all selected OBSIDs
         """
@@ -214,6 +226,7 @@ class Autoxte:
             self.pull(index)
             if bc is True:
                 self.barycenter(index)
+            self.remove_bloatdirs(index)
 
 
 def cli(args=None):
