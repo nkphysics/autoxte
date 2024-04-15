@@ -262,16 +262,25 @@ def cli(args=None):
         action="version",
         version=f"%(prog)s {VERSION}"
     )
+
+    p.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Engage debug mode for logging"
+    )
     argp = p.parse_args(args)
     return argp
 
 
 def main():
     level = logging.INFO
+    args = cli()
+    if args.debug is True:
+        level = logging.DEBUG
     logging.basicConfig(stream=sys.stdout,
                         level=level,
                         format="")
-    args = cli()
     xte = Autoxte(target=args.source)
     xte.selection()
     xte.pull_reduce(args.bc)
